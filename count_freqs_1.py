@@ -71,75 +71,20 @@ def get_ngrams(sent_iterator, n):
          #Then extract n-grams
          ngrams = (tuple(w_boundary[i:i+n]) for i in xrange(len(w_boundary)-n+1))
          for n_gram in ngrams: #Return one n-gram at a time
-            yield n_gram
+            yield n_gram        
 
-_RARE_ = u'_RARE_'
+
 class Hmm(object):
     """
     Stores counts for n-grams and emissions. 
     """
-    def __init__(self, handle):
-        self.words = {}
-        self.ngrams = {1 : {}, 2 : {}, 3 : {}}
-        self.word_counts = {}
-        self.tagToCount = {}
-        for l in handle:
-            t = l.strip().split()
-            count = int(t[0])
-            key = tuple(t[2:])
-            if t[1] == "1-GRAM": self.ngrams[1][key[0]] = count
-            elif t[1] == "2-GRAM": self.ngrams[2][key] = count
-            elif t[1] == "3-GRAM": self.ngrams[3][key] = count
-            elif t[1] == "WORDTAG":
-                self.tagToCount.setdefault(key[0], 0)
-                self.tagToCount[key[0]] += count
-                self.words[key] = count
-                self.word_counts.setdefault(key[1], 0)
-                self.word_counts[key[1]] += count
 
-    def modifyRareWords(self, minCount):
-        rareCounts = 0
-        self.word_counts.setdefault(_RARE_, 0)
-        rareWords = []
-        for i in self.word_counts:
-            if self.word_counts[i] < minCount:
-                curCount = self.word_counts[i]
-                rareWords += [i]
-                self.word_counts[_RARE_] += curCount
-
-        for i in rareWords:
-            del self.word_counts[i]
-
-        tagToRareCount = {}
-        for (tag, word) in self.words:
-            tagToRareCount.setdefault(tag, 0)
-            if word in rareWords:
-                tagToRareCount[tag] += self.words[(tag, word)]
-
-        for tag in self.tagToCount:
-            for word in rareWords:
-                if (tag, word) in self.words:
-                    del self.words[(tag, word)]
-            self.words[(tag, _RARE_)] = tagToRareCount[tag]
-
-    def tagFile(self, inFileHandle, outFileHandle):
-        for line in inFileHandle:
-            tok = str(line)
-            greatestTag = ''
-            greatestProb = 0
-            tok = tok.strip("\t\n\r")
-            orig_tok = tok
-            if len(tok) == 0:
-                outFileHandle.write('\n')
-            else:
-                for tag in self.tagToCount:
-                    if tok not in self.word_counts or (tag, tok) not in self.words:
-                        tok = _RARE_
-                    p = float( self.words[(tag, tok)]) / self.tagToCount[tag]
-                    if p > greatestProb:
-                        greatestProb = p
-                        greatestTag = tag
-                outFileHandle.write(orig_tok + ' ' + greatestTag + '\n')
+    def __init__(self, n=3):
+        assert n>=2, "Expecting n>=2."
+        self.n = n
+        self.emission_counts = defaultdict(int)
+        self.ngram_counts = [defaultdict(int) for i in xrange(self.n)]
+        self.all_states = set()
 
     def train(self, corpus_file):
         """
@@ -222,7 +167,7 @@ if __name__ == "__main__":
         sys.exit(1)
     
     # Initialize a trigram counter
-    counter = Hmm([])
+    counter = Hmm(3)
     # Collect counts
     counter.train(input)
     # Write the counts
